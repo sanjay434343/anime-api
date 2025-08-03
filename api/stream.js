@@ -4,66 +4,41 @@ export default async function handler(req, res) {
   const { title, episode } = req.query;
 
   if (!title || !episode) {
+    console.log("Missing query params");
     return res.status(400).json({ error: 'Missing title or episode' });
   }
 
   try {
-    console.log(`Searching anime: ${title}`);
+    console.log(`➡️ Searching for title: ${title}`);
     const searchRes = await axios.get(`https://kuroji.1ani.me/api/anime/search?query=${encodeURIComponent(title)}`);
-    const first = searchRes.data.results?.[0];
-    console.log("Search result:", first);
+    const results = searchRes.data.results;
+    console.log("Search Results:", results);
 
-    let metadata = {}, kurojiSources = [];
+    const first = results?.[0];
+    if (!first) throw new Error("No anime found for that title");
 
-    if (first) {
-      console.log("Fetching anime info...");
-      const infoRes = await axios.get(`https://kuroji.1ani.me/api/anime/info/${first.id}`);
-      metadata = infoRes.data || {};
-      console.log("Metadata fetched");
+    console.log(`✅ Found anime: ${first.id}`);
 
-      const episodesRes = await axios.get(`https://kuroji.1ani.me/api/anime/episodes/${first.id}`);
-      const ep = episodesRes.data.episodes.find(e => e.number == episode);
-      console.log("Episode found:", ep);
+    const infoRes = await axios.get(`https://kuroji.1ani.me/api/anime/info/${first.id}`);
+    const metadata = infoRes.data;
+    console.log("Metadata:", metadata.title?.english || metadata.title?.romaji);
 
-      if (ep) {
-        const streamRes = await axios.get(`https://kuroji.1ani.me/api/anime/stream/${ep.id}`);
-        kurojiSources = streamRes.data.sources || [];
-        console.log("Kuroji sources:", kurojiSources);
-      } else {
-        console.log("Episode not found for kuroji");
-      }
+    const episodesRes = await axios.get(`https://kuroji.1ani.me/api/anime/episodes/${first.id}`);
+    const episodeData = episodesRes.data.episodes.find(e => e.number == episode);
+    console.log("Episode Match:", episodeData);
+
+    let kurojiSources = [];
+    if (episodeData) {
+      const streamRes = await axios.get(`https://kuroji.1ani.me/api/anime/stream/${episodeData.id}`);
+      kurojiSources = streamRes.data.sources;
+      console.log("✅ Kuroji Sources:", kurojiSources.length);
+    } else {
+      console.log("❌ No matching episode found in Kuroji");
     }
 
-    let hianimeSources = [];
-    try {
-      console.log("Trying HiAnime fallback...");
-      const hianimeEpisodes = await axios.get(`https://api-aniwatch.onrender.com/anime/episodes/${first?.id || title}`);
-      const hianimeEp = hianimeEpisodes.data?.[0];
-      console.log("HiAnime episode found:", hianimeEp);
-
-      if (hianimeEp) {
-        const serversRes = await axios.get(`https://api-aniwatch.onrender.com/anime/servers?episodeId=${hianimeEp.id}&ep=${episode}`);
-        const server = serversRes.data?.[0]?.server;
-
-        if (server) {
-          const stream = await axios.get(`https://api-aniwatch.onrender.com/anime/episode-srcs?id=${hianimeEp.id}&server=${server}&category=sub`);
-          hianimeSources = stream.data || [];
-          console.log("HiAnime sources:", hianimeSources);
-        } else {
-          console.log("No server found in HiAnime");
-        }
-      }
-    } catch (e) {
-      console.warn("HiAnime fallback failed:", e.message);
-    }
-
-    res.status(200).json({
-      metadata,
-      sources: [...kurojiSources, ...hianimeSources]
-    });
-
-  } catch (error) {
-    console.error('Fetch error:', error?.response?.data || error.message);
+    res.status(200).json({ metadata, sources: kurojiSources });
+  } catch (err) {
+    console.error("🔥 Internal error:", err?.message || err);
     res.status(500).json({ error: 'Internal error fetching anime' });
   }
 }
