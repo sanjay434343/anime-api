@@ -1,9 +1,9 @@
 {
   "version": 2,
   "builds": [
-    { "src": "api/anime.js", "use": "@vercel/node" }
+    { "src": "api/stream.js", "use": "@vercel/node" }
   ],
   "routes": [
-    { "src": "/api/anime", "dest": "/api/anime.js" }
+    { "src": "/api/stream", "dest": "/api/stream.js" }
   ]
 }
