@@ -1,6 +1,6 @@
-import axios from 'axios';
+const axios = require('axios');
 
-export default async function handler(req, res) {
+module.exports = async (req, res) => {
   const { title, episode } = req.query;
 
   if (!title || !episode) {
@@ -52,4 +52,4 @@ export default async function handler(req, res) {
     console.error('Fetch error:', error?.response?.data || error.message);
     res.status(500).json({ error: 'Internal error fetching anime' });
   }
-}
+};
