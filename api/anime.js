@@ -1,4 +1,4 @@
-const axios = require('axios');
+import axios from 'axios';
 
 export default async function handler(req, res) {
   const { title, episode } = req.query;
@@ -8,7 +8,6 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Kuroji search
     const searchRes = await axios.get(`https://kuroji.1ani.me/api/anime/search?query=${encodeURIComponent(title)}`);
     const first = searchRes.data.results?.[0];
     let metadata = {}, kurojiSources = [];
@@ -26,7 +25,6 @@ export default async function handler(req, res) {
       }
     }
 
-    // HiAnime fallback
     let hianimeSources = [];
     try {
       const hianimeEpisodes = await axios.get(`https://api-aniwatch.onrender.com/anime/episodes/${first?.id || title}`);
@@ -34,8 +32,10 @@ export default async function handler(req, res) {
 
       if (hianimeEp) {
         const serversRes = await axios.get(`https://api-aniwatch.onrender.com/anime/servers?episodeId=${hianimeEp.id}&ep=${episode}`);
-        if (serversRes.data?.[0]) {
-          const stream = await axios.get(`https://api-aniwatch.onrender.com/anime/episode-srcs?id=${hianimeEp.id}&server=${serversRes.data[0].server}&category=sub`);
+        const server = serversRes.data?.[0]?.server;
+
+        if (server) {
+          const stream = await axios.get(`https://api-aniwatch.onrender.com/anime/episode-srcs?id=${hianimeEp.id}&server=${server}&category=sub`);
           hianimeSources = stream.data || [];
         }
       }
@@ -49,7 +49,7 @@ export default async function handler(req, res) {
     });
 
   } catch (error) {
-    console.error(error);
+    console.error('Fetch error:', error?.response?.data || error.message);
     res.status(500).json({ error: 'Internal error fetching anime' });
   }
 }
